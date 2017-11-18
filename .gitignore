@@ -1,0 +1,10 @@
+.idea/
+*.iml
+debug/
+release/
+config/
+Cargo.lock
+target/
+**/*.rs.bk
+*.gz
+manifest.json
