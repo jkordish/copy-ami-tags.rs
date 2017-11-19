@@ -17,6 +17,11 @@ rusoto_ec2   = "0.29"
 rusoto_sts   = "0.29"
 serde_json   = "^1"
 crossbeam    = "^0.3"
+slog         = "2"
+slog-stdlog  = "2"
+slog-term    = "2"
+slog-async   = "2"
+#error-chain  = "0.11.0"
 clippy       = {version="*", optional = true}
 
 [features]
