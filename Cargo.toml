@@ -8,7 +8,8 @@ license = "The MIT License (MIT)"
 
 keywords = [
   "aws",
-  "ami"
+  "ami",
+  "packer"
 ]
 
 [dependencies]
@@ -21,7 +22,6 @@ slog         = "2"
 slog-stdlog  = "2"
 slog-term    = "2"
 slog-async   = "2"
-#error-chain  = "0.11.0"
 clippy       = {version="*", optional = true}
 
 [features]
