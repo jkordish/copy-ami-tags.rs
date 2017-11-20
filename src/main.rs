@@ -64,7 +64,7 @@ fn main() {
     scope(|scope| {
         for artifact in artifacts.split(',') {
             let pair: Vec<&str> = artifact.split(':').collect();
-//            logging(&format!("Processing -- ACCOUNT: {} REGION: {} AMI: {}", &source_account, &pair[0], &pair[1]));
+            //            logging(&format!("Processing -- ACCOUNT: {} REGION: {} AMI: {}", &source_account, &pair[0], &pair[1]));
             scope.spawn(move || {
                 source_ami(role_name, source_account, shared_account, pair[0], pair[1]);
             });
@@ -130,64 +130,68 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
 }
 
 fn destination_ami(region: &str, ami: &str, shared_account: &[&str], role: &str, source_ami_tags: &[TagDescription]) {
-    for account in shared_account {
-        let source_ami_tags: Vec<_> = source_ami_tags.to_owned();
-//        logging(&format!("Applying tags -- ACCOUNT: {} REGION: {} AMI: {}", &account, &region, &ami));
-        // create our role_name from account and provided name
-        let role_name = format!("arn:aws:iam::{}:role/{}", account, role);
+    scope(|scope| {
+        for account in shared_account {
+            let source_ami_tags: Vec<_> = source_ami_tags.to_owned();
+            scope.spawn(move || {
+                //        logging(&format!("Applying tags -- ACCOUNT: {} REGION: {} AMI: {}", &account, &region, &ami));
+                // create our role_name from account and provided name
+                let role_name = format!("arn:aws:iam::{}:role/{}", account, role);
 
-        // set up our credentials provider for aws
-        let provider = match DefaultCredentialsProvider::new() {
-            Ok(provider) => provider,
-            Err(err) => panic!("Unable to load credentials. {}", err)
-        };
+                // set up our credentials provider for aws
+                let provider = match DefaultCredentialsProvider::new() {
+                    Ok(provider) => provider,
+                    Err(err) => panic!("Unable to load credentials. {}", err)
+                };
 
-        // initiate our sts client
-        let sts_client = StsClient::new(
-            default_tls_client().unwrap(),
-            provider,
-            Region::from_str(region).unwrap()
-        );
+                // initiate our sts client
+                let sts_client = StsClient::new(
+                    default_tls_client().unwrap(),
+                    provider,
+                    Region::from_str(region).unwrap()
+                );
 
-        // generate a sts provider
-        let sts_provider = StsAssumeRoleSessionCredentialsProvider::new(
-            sts_client,
-            role_name.to_owned(),
-            "packer-api".to_owned(),
-            None,
-            None,
-            None,
-            None
-        );
+                // generate a sts provider
+                let sts_provider = StsAssumeRoleSessionCredentialsProvider::new(
+                    sts_client,
+                    role_name.to_owned(),
+                    "packer-api".to_owned(),
+                    None,
+                    None,
+                    None,
+                    None
+                );
 
-        // allow our STS to auto-refresh
-        let auto_sts_provider = AutoRefreshingProvider::with_refcell(sts_provider).unwrap();
+                // allow our STS to auto-refresh
+                let auto_sts_provider = AutoRefreshingProvider::with_refcell(sts_provider).unwrap();
 
-        // create our ec2 client initialization
-        let client = Ec2Client::new(
-            default_tls_client().unwrap(),
-            auto_sts_provider,
-            Region::from_str(region).unwrap()
-        );
+                // create our ec2 client initialization
+                let client = Ec2Client::new(
+                    default_tls_client().unwrap(),
+                    auto_sts_provider,
+                    Region::from_str(region).unwrap()
+                );
 
-        // create mutable vec of our source ami tags
-        let mut tags: Vec<_> = vec![];
+                // create mutable vec of our source ami tags
+                let mut tags: Vec<_> = vec![];
 
-        // loop through the tags from our source ami and add it to our mutable tags_buff vec
-        for tag in source_ami_tags {
-            tags.push(Tag { key: Some(tag.key.unwrap().to_string()), value: Some(tag.value.unwrap().to_string()) })
+                // loop through the tags from our source ami and add it to our mutable tags_buff vec
+                for tag in source_ami_tags {
+                    tags.push(Tag { key: Some(tag.key.unwrap().to_string()), value: Some(tag.value.unwrap().to_string()) })
+                }
+
+                // create a CreateTagsRequest
+                let tag_request = CreateTagsRequest { resources: vec![ami.to_owned()], tags, ..Default::default() };
+
+                // apply tags
+                if client.create_tags(&tag_request).is_ok() {
+                    logging(&format!("Copied tags -- ACCOUNT: {} REGION: {} AMI: {}", account, region, ami))
+                } else {
+                    logging(&format!("Unsuccessful in copying tags -- ACCOUNT: {} REGION: {} AMI: {} ", account, region, ami))
+                };
+            });
         }
-
-        // create a CreateTagsRequest
-        let tag_request = CreateTagsRequest { resources: vec![ami.to_owned()], tags, ..Default::default() };
-
-        // apply tags
-        if client.create_tags(&tag_request).is_ok() {
-            logging(&format!("Copied tags -- ACCOUNT: {} REGION: {} AMI: {}", account, region, ami))
-        } else {
-            logging(&format!("Unsuccessful in copying tags -- ACCOUNT: {} REGION: {} AMI: {} ", account, region, ami))
-        };
-    }
+    });
 }
 
 fn logging(msg: &str) {
