@@ -28,6 +28,10 @@ clippy       = {version="*", optional = true}
 default=[]
 
 [profile.release]
-panic     = "abort"
-lto       = true
-#opt-level = "s"
+panic            = "abort"
+lto              = false
+debug            = false
+rpath            = false
+opt-level        = 3
+codegen-units    = 1
+debug-assertions = false
