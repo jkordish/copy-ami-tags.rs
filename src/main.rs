@@ -64,9 +64,9 @@ fn main() {
     scope(|scope| {
         for artifact in artifacts.split(',') {
             let pair: Vec<&str> = artifact.split(':').collect();
+//            logging(&format!("Processing -- ACCOUNT: {} REGION: {} AMI: {}", &source_account, &pair[0], &pair[1]));
             scope.spawn(move || {
                 source_ami(role_name, source_account, shared_account, pair[0], pair[1]);
-                logging(&format!("Processing AMI {} in REGION {} for ACCOUNT {}", &pair[0], &pair[1], &source_account));
             });
         }
     });
@@ -116,7 +116,7 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
     // create our request
     let tags_request = DescribeTagsRequest { filters: Some(vec![filter]), ..Default::default() };
 
-    logging(&format!("Requesting tags from AMI {} in REGION {} for ACCOUNT {}", &ami, &region, &source_account));
+    logging(&format!("Requesting tags -- ACCOUNT: {} REGION: {} AMI: {}", &source_account, &region, &ami));
 
     // grab those tags and attempt to unwrap them
     // if successful, then send those tags to the dest ami
@@ -132,7 +132,7 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
 fn destination_ami(region: &str, ami: &str, shared_account: &[&str], role: &str, source_ami_tags: &[TagDescription]) {
     for account in shared_account {
         let source_ami_tags: Vec<_> = source_ami_tags.to_owned();
-        logging(&format!("Applying tags to AMI {} in REGION {} for ACCOUNT {}", &ami, &region, &account));
+//        logging(&format!("Applying tags -- ACCOUNT: {} REGION: {} AMI: {}", &account, &region, &ami));
         // create our role_name from account and provided name
         let role_name = format!("arn:aws:iam::{}:role/{}", account, role);
 
@@ -183,9 +183,9 @@ fn destination_ami(region: &str, ami: &str, shared_account: &[&str], role: &str,
 
         // apply tags
         if client.create_tags(&tag_request).is_ok() {
-            logging(&format!("Successfully copied tags to AMI {} in ACCOUNT {} for REGION {}", ami, account, region))
+            logging(&format!("Copied tags -- ACCOUNT: {} REGION: {} AMI: {}", account, region, ami))
         } else {
-            logging(&format!("Unsuccessful in copying tags from AMI {} to ACCOUNT {} for REGION {}", ami, account, region))
+            logging(&format!("Unsuccessful in copying tags -- ACCOUNT: {} REGION: {} AMI: {} ", account, region, ami))
         };
     }
 }
