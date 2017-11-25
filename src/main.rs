@@ -37,7 +37,7 @@ fn main() {
     let packer_manifest = match File::open(&"manifest.json") {
         Ok(file) => file,
         Err(_) => {
-            println!("Unable to open manifest.json");
+            logging("crit","Unable to open manifest.json");
             exit(1)
         }
     };
@@ -46,7 +46,7 @@ fn main() {
     let manifest: Value = match serde_json::from_reader(packer_manifest) {
         Ok(json) => json,
         Err(_) => {
-            println!("manifest.json not valid json?");
+            logging("crit","manifest.json not valid json?");
             exit(1)
         }
     };
@@ -55,7 +55,7 @@ fn main() {
     let artifacts = match manifest["builds"][0]["artifact_id"].as_str() {
         Some(artifacts) => artifacts,
         _ => {
-            println!("No artifacts present in manifest");
+            logging("crit","No artifacts present in manifest");
             exit(1)
         }
     };
@@ -64,7 +64,7 @@ fn main() {
     scope(|scope| {
         for artifact in artifacts.split(',') {
             let pair: Vec<&str> = artifact.split(':').collect();
-            //            logging(&format!("Processing -- ACCOUNT: {} REGION: {} AMI: {}", &source_account, &pair[0], &pair[1]));
+            logging("info",&format!("Processing {} within region {} for ami {}", &source_account, &pair[0], &pair[1]));
             scope.spawn(move || {
                 source_ami(role_name, source_account, shared_account, pair[0], pair[1]);
             });
@@ -79,7 +79,9 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
     // set up our credentials provider for aws
     let provider = match DefaultCredentialsProvider::new() {
         Ok(provider) => provider,
-        Err(err) => panic!("Unable to load credentials. {}", err)
+        Err(err) => {
+            logging("crit", &format!("Unable to load credentials. {}", err)); exit(1)
+        }
     };
 
     // initiate our sts client
@@ -116,14 +118,14 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
     // create our request
     let tags_request = DescribeTagsRequest { filters: Some(vec![filter]), ..Default::default() };
 
-    logging(&format!("Requesting tags -- ACCOUNT: {} REGION: {} AMI: {}", &source_account, &region, &ami));
+    logging("info",&format!("Requesting tags in {} within region {} for ami {}", &source_account, &region, &ami));
 
     // grab those tags and attempt to unwrap them
     // if successful, then send those tags to the dest ami
     match client.describe_tags(&tags_request) {
         Ok(_src_ami) => destination_ami(region, ami, shared_account, role, &_src_ami.tags.unwrap()),
         Err(e) => {
-            logging(&format!("Unable to collect tags for {} Error: {:?}", ami, e));
+            logging("crit",&format!("Unable to collect tags for {} Error: {:?}", ami, e));
             exit(1)
         }
     };
@@ -141,7 +143,9 @@ fn destination_ami(region: &str, ami: &str, shared_account: &[&str], role: &str,
                 // set up our credentials provider for aws
                 let provider = match DefaultCredentialsProvider::new() {
                     Ok(provider) => provider,
-                    Err(err) => panic!("Unable to load credentials. {}", err)
+                    Err(err) => {
+                        logging("crit", &format!("Unable to load credentials. {}", err)); exit(1)
+                    }
                 };
 
                 // initiate our sts client
@@ -185,20 +189,26 @@ fn destination_ami(region: &str, ami: &str, shared_account: &[&str], role: &str,
 
                 // apply tags
                 if client.create_tags(&tag_request).is_ok() {
-                    logging(&format!("Copied tags -- ACCOUNT: {} REGION: {} AMI: {}", account, region, ami))
+                    logging("info", &format!("Copied tags to {} within region {} for ami {}", account, region, ami))
                 } else {
-                    logging(&format!("Unsuccessful in copying tags -- ACCOUNT: {} REGION: {} AMI: {} ", account, region, ami))
+                    logging("error", &format!("Unsuccessful in copying tags to {} within region {} for ami {} ", account, region, ami))
                 };
             });
         }
     });
 }
 
-fn logging(msg: &str) {
+fn logging(log_type: &str, msg: &str) {
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
 
     let logger = slog::Logger::root(drain, o!());
-    info!(logger, "copy-ami-tags"; "[*]" => &msg)
+
+    match log_type {
+        "info" => info!(logger, "copy-ami-tags"; "[*]" => &msg),
+        "error" => error!(logger, "copy-ami-tags"; "[*]" => &msg),
+        "crit" => crit!(logger, "copy-ami-tags"; "[*]" => &msg),
+        _ => {},
+    }
 }

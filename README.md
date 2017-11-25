@@ -28,5 +28,5 @@ $ cargo install --git https://github.com/jkordish/copy-ami-tags.rs.git
 
 ### executing
 ```shell
-$ copy-ami-tags-rs <role_name> <source_account> <shared_accounts,shared_accounts,shared_accounts>
+$ copy-ami-tags <role_name> <source_account> <shared_accounts,shared_accounts,shared_accounts>
 ```
