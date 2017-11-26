@@ -37,7 +37,7 @@ fn main() {
     let packer_manifest = match File::open(&"manifest.json") {
         Ok(file) => file,
         Err(_) => {
-            logging("crit","Unable to open manifest.json");
+            logging("crit", "Unable to open manifest.json");
             exit(1)
         }
     };
@@ -46,7 +46,7 @@ fn main() {
     let manifest: Value = match serde_json::from_reader(packer_manifest) {
         Ok(json) => json,
         Err(_) => {
-            logging("crit","manifest.json not valid json?");
+            logging("crit", "manifest.json not valid json?");
             exit(1)
         }
     };
@@ -55,7 +55,7 @@ fn main() {
     let artifacts = match manifest["builds"][0]["artifact_id"].as_str() {
         Some(artifacts) => artifacts,
         _ => {
-            logging("crit","No artifacts present in manifest");
+            logging("crit", "No artifacts present in manifest");
             exit(1)
         }
     };
@@ -64,7 +64,7 @@ fn main() {
     scope(|scope| {
         for artifact in artifacts.split(',') {
             let pair: Vec<&str> = artifact.split(':').collect();
-            logging("info",&format!("Processing {} within region {} for ami {}", &source_account, &pair[0], &pair[1]));
+            logging("info", &format!("Processing {} within region {} for ami {}", &source_account, &pair[0], &pair[1]));
             scope.spawn(move || {
                 source_ami(role_name, source_account, shared_account, pair[0], pair[1]);
             });
@@ -80,7 +80,8 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
     let provider = match DefaultCredentialsProvider::new() {
         Ok(provider) => provider,
         Err(err) => {
-            logging("crit", &format!("Unable to load credentials. {}", err)); exit(1)
+            logging("crit", &format!("Unable to load credentials. {}", err));
+            exit(1)
         }
     };
 
@@ -118,14 +119,14 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
     // create our request
     let tags_request = DescribeTagsRequest { filters: Some(vec![filter]), ..Default::default() };
 
-    logging("info",&format!("Requesting tags in {} within region {} for ami {}", &source_account, &region, &ami));
+    logging("info", &format!("Requesting tags in {} within region {} for ami {}", &source_account, &region, &ami));
 
     // grab those tags and attempt to unwrap them
     // if successful, then send those tags to the dest ami
     match client.describe_tags(&tags_request) {
         Ok(_src_ami) => destination_ami(region, ami, shared_account, role, &_src_ami.tags.unwrap()),
         Err(e) => {
-            logging("crit",&format!("Unable to collect tags for {} Error: {:?}", ami, e));
+            logging("crit", &format!("Unable to collect tags for {} Error: {:?}", ami, e));
             exit(1)
         }
     };
@@ -144,7 +145,8 @@ fn destination_ami(region: &str, ami: &str, shared_account: &[&str], role: &str,
                 let provider = match DefaultCredentialsProvider::new() {
                     Ok(provider) => provider,
                     Err(err) => {
-                        logging("crit", &format!("Unable to load credentials. {}", err)); exit(1)
+                        logging("crit", &format!("Unable to load credentials. {}", err));
+                        exit(1)
                     }
                 };
 
@@ -209,6 +211,6 @@ fn logging(log_type: &str, msg: &str) {
         "info" => info!(logger, "copy-ami-tags"; "[*]" => &msg),
         "error" => error!(logger, "copy-ami-tags"; "[*]" => &msg),
         "crit" => crit!(logger, "copy-ami-tags"; "[*]" => &msg),
-        _ => {},
+        _ => {}
     }
 }
