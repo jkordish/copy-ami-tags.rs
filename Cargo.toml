@@ -1,6 +1,6 @@
 [package]
 name     = "copy-ami-tags-rs"
-version  = "0.1.0"
+version  = "0.1.1"
 authors  = ["Joseph Kordish <joe@unicornclouds.com>"]
 readme   = "README.md"
 license  = "The MIT License (MIT)"
@@ -28,8 +28,8 @@ clippy       = { version="*", optional = true }
 default=[]
 
 [profile.release]
-panic            = "abort"
-lto              = false
+panic            = "unwind"
+lto              = true
 debug            = false
 rpath            = false
 opt-level        = 3

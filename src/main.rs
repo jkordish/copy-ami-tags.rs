@@ -104,7 +104,13 @@ fn source_ami(role: &str, source_account: &str, shared_account: &[&str], region:
     );
 
     // allow our STS to auto-refresh
-    let auto_sts_provider = AutoRefreshingProvider::with_refcell(sts_provider).unwrap();
+    let auto_sts_provider = match AutoRefreshingProvider::with_refcell(sts_provider) {
+        Ok(auto_sts_provider) => auto_sts_provider,
+        Err(_) => {
+            logging("crit", "Unable to load STS credentials");
+            exit(1)
+        }
+    };
 
     // create our ec2 client initialization
     let client = Ec2Client::new(
