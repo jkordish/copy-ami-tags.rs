@@ -1,4 +1,4 @@
-# copy-ami-tags.rs
+# copy-ami-tags.rs [![Build Status](https://travis-ci.org/jkordish/copy-ami-tags.rs.svg?branch=master)](https://travis-ci.org/jkordish/copy-ami-tags.rs)
 Take [Packer](https://github.com/hashicorp/packer/) generated manifest.json and copy the AMI tags to other accounts
 
 ### building from source
@@ -23,7 +23,7 @@ $ curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly
 ```
 
 ```shell
-$ cargo install --git https://github.com/jkordish/copy-ami-tags.rs.git 
+$ cargo install --git https://github.com/jkordish/copy-ami-tags.rs.git
 ```
 
 ### executing
