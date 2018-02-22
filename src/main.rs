@@ -1,4 +1,5 @@
 #![feature(plugin)]
+#![feature(nll)]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 
 extern crate rusoto_core;
