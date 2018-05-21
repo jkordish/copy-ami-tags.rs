@@ -13,7 +13,7 @@ extern crate slog_async;
 extern crate slog_term;
 
 use crossbeam::scope;
-use rusoto_core::{AutoRefreshingProvider, Region};
+use rusoto_core::{reactor::RequestDispatcher, AutoRefreshingProvider, Region};
 use rusoto_ec2::{
     CreateTagsRequest, DescribeTagsRequest, Ec2, Ec2Client, Filter, Tag, TagDescription,
 };
@@ -97,7 +97,7 @@ fn source_ami(
     );
 
     // allow our STS to auto-refresh
-    let _auto_sts_provider = match AutoRefreshingProvider::with_refcell(sts_provider) {
+    let auto_sts_provider = match AutoRefreshingProvider::with_refcell(sts_provider) {
         Ok(auto_sts_provider) => auto_sts_provider,
         Err(_) => {
             logging("crit", "Unable to load STS credentials").is_ok();
@@ -106,7 +106,11 @@ fn source_ami(
     };
 
     // create our ec2 client initialization
-    let client = Ec2Client::simple(Region::from_str(region)?);
+    let client = Ec2Client::new(
+        RequestDispatcher::default(),
+        auto_sts_provider,
+        Region::from_str(region)?,
+    );
 
     // create our filter for the source ami
     let filter = Filter {
@@ -175,11 +179,14 @@ fn destination_ami(
                 );
 
                 // allow our STS to auto-refresh
-                let _auto_sts_provider =
-                    AutoRefreshingProvider::with_refcell(sts_provider).unwrap();
+                let auto_sts_provider = AutoRefreshingProvider::with_refcell(sts_provider).unwrap();
 
                 // create our ec2 client initialization
-                let client = Ec2Client::simple(Region::from_str(region).unwrap());
+                let client = Ec2Client::new(
+                    RequestDispatcher::default(),
+                    auto_sts_provider,
+                    Region::from_str(region).unwrap(),
+                );
 
                 // create mutable vec of our source ami tags
                 let mut tags: Vec<_> = vec![];

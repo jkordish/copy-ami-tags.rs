@@ -1,6 +1,6 @@
 [package]
 name     = "copy-ami-tags-rs"
-version  = "0.1.1"
+version  = "0.1.2"
 authors  = ["Joseph Kordish <joe@unicornclouds.com>"]
 readme   = "README.md"
 license  = "The MIT License (MIT)"
@@ -9,9 +9,6 @@ keywords = [
   "ami",
   "packer"
 ]
-
-[[bin]]
-name = "copy-ami-tags"
 
 [dependencies]
 rusoto_core  = "0.32"
