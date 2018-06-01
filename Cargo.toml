@@ -1,6 +1,6 @@
 [package]
 name     = "copy-ami-tags-rs"
-version  = "0.1.2"
+version  = "0.1.4"
 authors  = ["Joseph Kordish <joe@unicornclouds.com>"]
 readme   = "README.md"
 license  = "The MIT License (MIT)"
@@ -19,7 +19,6 @@ crossbeam    = "^0.3"
 slog         = "2"
 slog-term    = "2"
 slog-async   = "2"
-clippy       = { version="*", optional = true }
 
 [features]
 default=[]

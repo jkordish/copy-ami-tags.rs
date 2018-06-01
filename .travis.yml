@@ -12,7 +12,7 @@ deploy:
   provider: releases
   api_key:
     secure: IYdzYLh+8GxtMegoGxArsceIAxzea8ZxGt3twifDrIsyFHOsb9Ydnn4BrUtZRr3ISoEs3cR1zN9prHZY+uE60AqCe8hrD5EkbzRXTUn3s/b6eorqw5nOxCQNG5P6tgYHxwOueFTv87f0OnPcib/VCsndW95CcMlNs4ARLYWNj9nPrVucMcyNteOTl75dVf17oUnrHS7IfloKLZUuZV01sCLnmv2Uu7xxEq7LkIUQUOenLlZW6zFpbissLCB0K0f2kgFi4+nH17K7mm4rRgdXjqqnGxAzASN9OFqalSR1ZKqLmWEW5gtouG0IsAAnP3U1LY9cQoaE5XHFTYCxWxWg0VJwbDQ7xV38o02F/aHHy74qPNkV+XW8PceSOGaX2GymQ19BecTx7fnzA1hTSII7pFlFMT0FPlb2bkiRonp8fhAno3U8g0UuFFyzE0D7ttX9E4j5PfU32YTqx0V7LrPv35zp96MTuEKzGk6cB/12TUkJxbAniL9b/Ghh7+vB8kfv1r9mt/TIk9Ife/UDnDx3YcVOZlWnDFufx88LbDNJIlcYxHoO2UPKTJT+0nL4FbTFBxBN1HeWbrekQqmCt/Ha+OFUT9g6r3Vx8lIrAe0ov4p0EglhOONP+PLZSj1304lbG5FMyKE1gwaAhGoLi76hwrv34DozfmxKGhvrHoufmQk=
-  file: "./target/release/copy-ami-tags"
+  file: "./target/release/copy-ami-tags-rs"
   on:
     tags: true
   skip_cleanup: true

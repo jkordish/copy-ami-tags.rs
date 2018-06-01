@@ -1,7 +1,5 @@
-#![feature(plugin)]
 #![feature(nll)]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
-
+#[cfg_attr(feature = "cargo-clippy", allow(clippy_pedantic))]
 extern crate crossbeam;
 extern crate rusoto_core;
 extern crate rusoto_ec2;
@@ -114,7 +112,7 @@ fn source_ami(
 
     // create our filter for the source ami
     let filter = Filter {
-        name: Some("resource-id".to_string()),
+        name: Some("resource-id".to_owned()),
         values: Some(vec![ami.to_owned()]),
     };
 
@@ -156,77 +154,73 @@ fn destination_ami(
     role: &str,
     source_ami_tags: &[TagDescription],
 ) -> Result<(), Box<Error>> {
-    scope(|scope| {
-        for account in shared_account {
-            let source_ami_tags: Vec<_> = source_ami_tags.to_owned();
-            scope.spawn(move || {
-                //        logging(&format!("Applying tags -- ACCOUNT: {} REGION: {} AMI: {}", &account, &region, &ami));
-                // create our role_name from account and provided name
-                let role_name = format!("arn:aws:iam::{}:role/{}", account, role);
+    for account in shared_account {
+        let source_ami_tags: Vec<_> = source_ami_tags.to_owned();
+        //        logging(&format!("Applying tags -- ACCOUNT: {} REGION: {} AMI: {}", &account, &region, &ami));
+        // create our role_name from account and provided name
+        let role_name = format!("arn:aws:iam::{}:role/{}", account, role);
 
-                // initiate our sts client
-                let sts_client = StsClient::simple(Region::from_str(region).unwrap());
+        // initiate our sts client
+        let sts_client = StsClient::simple(Region::from_str(region)?);
 
-                // generate a sts provider
-                let sts_provider = StsAssumeRoleSessionCredentialsProvider::new(
-                    sts_client,
-                    role_name.to_owned(),
-                    "packer-api".to_owned(),
-                    None,
-                    None,
-                    None,
-                    None,
-                );
+        // generate a sts provider
+        let sts_provider = StsAssumeRoleSessionCredentialsProvider::new(
+            sts_client,
+            role_name.to_owned(),
+            "packer-api".to_owned(),
+            None,
+            None,
+            None,
+            None,
+        );
 
-                // allow our STS to auto-refresh
-                let auto_sts_provider = AutoRefreshingProvider::with_refcell(sts_provider).unwrap();
+        // allow our STS to auto-refresh
+        let auto_sts_provider = AutoRefreshingProvider::with_refcell(sts_provider)?;
 
-                // create our ec2 client initialization
-                let client = Ec2Client::new(
-                    RequestDispatcher::default(),
-                    auto_sts_provider,
-                    Region::from_str(region).unwrap(),
-                );
+        // create our ec2 client initialization
+        let client = Ec2Client::new(
+            RequestDispatcher::default(),
+            auto_sts_provider,
+            Region::from_str(region)?,
+        );
 
-                // create mutable vec of our source ami tags
-                let mut tags: Vec<_> = vec![];
+        // create mutable vec of our source ami tags
+        let mut tags: Vec<_> = vec![];
 
-                // loop through the tags from our source ami and add it to our mutable tags_buff vec
-                for tag in source_ami_tags {
-                    tags.push(Tag {
-                        key: Some(tag.key.unwrap().to_string()),
-                        value: Some(tag.value.unwrap().to_string()),
-                    })
-                }
-
-                // create a CreateTagsRequest
-                let tag_request = CreateTagsRequest {
-                    resources: vec![ami.to_owned()],
-                    tags,
-                    ..Default::default()
-                };
-
-                // apply tags
-                if client.create_tags(&tag_request).sync().is_ok() {
-                    logging(
-                        "info",
-                        &format!(
-                            "Copied tags to {} within region {} for ami {}",
-                            account, region, ami
-                        ),
-                    ).is_ok()
-                } else {
-                    logging(
-                        "error",
-                        &format!(
-                            "Unsuccessful in copying tags to {} within region {} for ami {} ",
-                            account, region, ami
-                        ),
-                    ).is_ok()
-                };
-            });
+        // loop through the tags from our source ami and add it to our mutable tags_buff vec
+        for tag in source_ami_tags {
+            tags.push(Tag {
+                key: Some(tag.key.unwrap().to_owned()),
+                value: Some(tag.value.unwrap().to_owned()),
+            })
         }
-    });
+
+        // create a CreateTagsRequest
+        let tag_request = CreateTagsRequest {
+            resources: vec![ami.to_owned()],
+            tags,
+            ..Default::default()
+        };
+
+        // apply tags
+        if client.create_tags(&tag_request).sync().is_ok() {
+            logging(
+                "info",
+                &format!(
+                    "Copied tags to {} within region {} for ami {}",
+                    account, region, ami
+                ),
+            ).is_ok();
+        } else {
+            logging(
+                "error",
+                &format!(
+                    "Unsuccessful in copying tags to {} within region {} for ami {}",
+                    account, region, ami
+                ),
+            ).is_ok();
+        }
+    }
     Ok(())
 }
 
