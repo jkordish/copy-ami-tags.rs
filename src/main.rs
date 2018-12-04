@@ -1,19 +1,15 @@
-#![feature(nll)]
-#[cfg_attr(feature = "cargo-clippy", allow(clippy_pedantic))]
-extern crate crossbeam;
-extern crate rusoto_core;
-extern crate rusoto_ec2;
-extern crate rusoto_sts;
-extern crate serde_json;
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(renamed_and_removed_lints, clippy::pedantic)
+)]
 #[macro_use]
 extern crate slog;
-extern crate slog_async;
-extern crate slog_term;
 
 use crossbeam::scope;
-use rusoto_core::{reactor::RequestDispatcher, AutoRefreshingProvider, Region};
+use rusoto_core::{request::HttpClient, Region};
+use rusoto_credential::{AutoRefreshingProvider, DefaultCredentialsProvider};
 use rusoto_ec2::{
-    CreateTagsRequest, DescribeTagsRequest, Ec2, Ec2Client, Filter, Tag, TagDescription,
+    CreateTagsRequest, DescribeTagsRequest, Ec2, Ec2Client, Filter, Tag, TagDescription
 };
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use serde_json::Value;
@@ -60,8 +56,9 @@ fn main() -> Result<(), Box<Error>> {
                 &format!(
                     "Processing {} within region {} for ami {}",
                     &source_account, &pair[0], &pair[1]
-                ),
-            ).is_ok();
+                )
+            )
+            .is_ok();
             scope.spawn(move || {
                 source_ami(role_name, source_account, shared_account, pair[0], pair[1]).is_ok();
             });
@@ -75,13 +72,18 @@ fn source_ami(
     source_account: &str,
     shared_account: &[&str],
     region: &str,
-    ami: &str,
+    ami: &str
 ) -> Result<(), Box<Error>> {
     // create our role_name from the source account and provided role name
     let role_name = format!("arn:aws:iam::{}:role/{}", source_account, role);
 
+    let credentials = DefaultCredentialsProvider::new();
+
     // set up our credentials provider for aws
-    let sts_client = StsClient::simple(Region::from_str(region)?);
+
+    // initiate our sts client
+    let sts_client =
+        StsClient::new_with(HttpClient::new()?, credentials?, Region::from_str(region)?);
 
     // generate a sts provider
     let sts_provider = StsAssumeRoleSessionCredentialsProvider::new(
@@ -91,11 +93,12 @@ fn source_ami(
         None,
         None,
         None,
-        None,
+        None
     );
 
     // allow our STS to auto-refresh
-    let auto_sts_provider = match AutoRefreshingProvider::with_refcell(sts_provider) {
+    #[allow(unused_variables)]
+    let auto_sts_provider = match AutoRefreshingProvider::new(sts_provider) {
         Ok(auto_sts_provider) => auto_sts_provider,
         Err(_) => {
             logging("crit", "Unable to load STS credentials").is_ok();
@@ -104,16 +107,16 @@ fn source_ami(
     };
 
     // create our ec2 client initialization
-    let client = Ec2Client::new(
-        RequestDispatcher::default(),
+    let client = Ec2Client::new_with(
+        HttpClient::new()?,
         auto_sts_provider,
-        Region::from_str(region)?,
+        Region::from_str(region)?
     );
 
     // create our filter for the source ami
     let filter = Filter {
         name: Some("resource-id".to_owned()),
-        values: Some(vec![ami.to_owned()]),
+        values: Some(vec![ami.to_owned()])
     };
 
     // create our request
@@ -127,20 +130,22 @@ fn source_ami(
         &format!(
             "Requesting tags in {} within region {} for ami {}",
             &source_account, &region, &ami
-        ),
-    ).is_ok();
+        )
+    )
+    .is_ok();
 
     // grab those tags and attempt to unwrap them
     // if successful, then send those tags to the dest ami
-    match client.describe_tags(&tags_request).sync() {
+    match client.describe_tags(tags_request).sync() {
         Ok(_src_ami) => {
             destination_ami(region, ami, shared_account, role, &_src_ami.tags.unwrap()).is_ok();
         }
         Err(e) => {
             logging(
                 "crit",
-                &format!("Unable to collect tags for {} Error: {:?}", ami, e),
-            ).is_ok();
+                &format!("Unable to collect tags for {} Error: {:?}", ami, e)
+            )
+            .is_ok();
             exit(1)
         }
     };
@@ -152,7 +157,7 @@ fn destination_ami(
     ami: &str,
     shared_account: &[&str],
     role: &str,
-    source_ami_tags: &[TagDescription],
+    source_ami_tags: &[TagDescription]
 ) -> Result<(), Box<Error>> {
     for account in shared_account {
         let source_ami_tags: Vec<_> = source_ami_tags.to_owned();
@@ -160,8 +165,13 @@ fn destination_ami(
         // create our role_name from account and provided name
         let role_name = format!("arn:aws:iam::{}:role/{}", account, role);
 
+        let credentials = DefaultCredentialsProvider::new();
+
+        // set up our credentials provider for aws
+
         // initiate our sts client
-        let sts_client = StsClient::simple(Region::from_str(region)?);
+        let sts_client =
+            StsClient::new_with(HttpClient::new()?, credentials?, Region::from_str(region)?);
 
         // generate a sts provider
         let sts_provider = StsAssumeRoleSessionCredentialsProvider::new(
@@ -171,17 +181,24 @@ fn destination_ami(
             None,
             None,
             None,
-            None,
+            None
         );
 
         // allow our STS to auto-refresh
-        let auto_sts_provider = AutoRefreshingProvider::with_refcell(sts_provider)?;
+        #[allow(unused_variables)]
+        let auto_sts_provider = match AutoRefreshingProvider::new(sts_provider) {
+            Ok(auto_sts_provider) => auto_sts_provider,
+            Err(_) => {
+                logging("crit", "Unable to load STS credentials").is_ok();
+                exit(1)
+            }
+        };
 
         // create our ec2 client initialization
-        let client = Ec2Client::new(
-            RequestDispatcher::default(),
+        let client = Ec2Client::new_with(
+            HttpClient::new()?,
             auto_sts_provider,
-            Region::from_str(region)?,
+            Region::from_str(region)?
         );
 
         // create mutable vec of our source ami tags
@@ -191,7 +208,7 @@ fn destination_ami(
         for tag in source_ami_tags {
             tags.push(Tag {
                 key: Some(tag.key.unwrap().to_owned()),
-                value: Some(tag.value.unwrap().to_owned()),
+                value: Some(tag.value.unwrap().to_owned())
             })
         }
 
@@ -203,22 +220,24 @@ fn destination_ami(
         };
 
         // apply tags
-        if client.create_tags(&tag_request).sync().is_ok() {
+        if client.create_tags(tag_request).sync().is_ok() {
             logging(
                 "info",
                 &format!(
                     "Copied tags to {} within region {} for ami {}",
                     account, region, ami
-                ),
-            ).is_ok();
+                )
+            )
+            .is_ok();
         } else {
             logging(
                 "error",
                 &format!(
                     "Unsuccessful in copying tags to {} within region {} for ami {}",
                     account, region, ami
-                ),
-            ).is_ok();
+                )
+            )
+            .is_ok();
         }
     }
     Ok(())
@@ -244,6 +263,6 @@ fn logging(log_type: &str, msg: &str) -> Result<(), Box<Error>> {
             crit!(logger, "copy-ami-tags"; "[*]" => &msg);
             Ok(())
         }
-        _ => Ok(()),
+        _ => Ok(())
     }
 }
